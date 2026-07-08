@@ -156,11 +156,42 @@ Padrão: mixa a trilha da base com o microfone da câmera (`--mode camera` ou
 `base` para usar só uma; `--base-vol`/`--cam-vol` para balancear). O mesmo
 offset da composição.
 
+## Fluxo C — Remover silêncios e pausas (opcional)
+
+Etapa final, aplicada no vídeo já pronto (depois de compor câmera e áudio),
+para que os cortes considerem exatamente o áudio que o espectador vai ouvir.
+Ofereça ao usuário antes de entregar; só aplique se ele pedir ou aceitar.
+
+### 1. Analisar primeiro, sem cortar
+
+```bash
+python scripts/cut_silence.py final.mp4 --analyze-only
+```
+
+Mostra as pausas detectadas, quanto tempo seria removido e o número de
+cortes. Reporte ao usuário (ex.: "2m10s → 1m38s, 14 cortes") e confirme.
+
+### 2. Cortar
+
+```bash
+python scripts/cut_silence.py final.mp4 --out final_cut.mp4
+```
+
+Padrões: pausas ≥ 0.8 s abaixo de -35 dB, mantendo 0.15 s de respiro em
+volta da fala. Ajustes comuns:
+
+- Removeu fala baixa: `--threshold -45` (mais conservador).
+- Deixou pausas demais: `--threshold -30` ou `--min-silence 0.5`.
+- Cortes secos demais: aumente `--pad` (0.25–0.35) e/ou `--min-silence`.
+- Vídeo com música de fundo contínua: não use este fluxo (nada será
+  detectado como silêncio) — avise o usuário.
+
 ## Fluxo completo (tela + câmera → Shorts)
 
 probe → extract_frames → analisar frames → plan.json → render_vertical →
-sync_offset → compose_camera (sobre o vertical.mp4) → mix_audio → conferir
-frames do resultado → entregar com resumo das decisões.
+sync_offset → compose_camera (sobre o vertical.mp4) → mix_audio →
+[opcional: cut_silence --analyze-only → confirmar → cut_silence] →
+conferir frames do resultado → entregar com resumo das decisões.
 
 ## Solução de problemas
 

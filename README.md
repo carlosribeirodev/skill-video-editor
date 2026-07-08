@@ -15,6 +15,10 @@ O que ela faz:
   key), na posição e tamanho que você quiser.
 - **Sincronia e áudio**: detecta automaticamente o offset entre a gravação da
   tela e a da câmera (por correlação de áudio) e mixa as duas trilhas.
+- **Remoção de silêncios (opcional)**: detecta pausas na fala e corta os
+  trechos mortos do vídeo final antes da entrega, mantendo um respiro
+  configurável em volta de cada fala — sempre mostrando antes quanto tempo
+  seria removido, para você aprovar.
 
 ## Requisitos do sistema
 
@@ -99,6 +103,8 @@ screen.mp4 ──► probe.py ──► extract_frames.py ──► Claude anali
                                                         │
                                               render_vertical.py ──► vertical.mp4
 camera.mp4 ──► sync_offset.py (offset) ──► compose_camera.py ──► mix_audio.py ──► final.mp4
+                                                                                      │
+                                                     cut_silence.py (opcional) ◄─────┘
 ```
 
 A parte "inteligente" (decidir o que enquadrar) é feita pelo próprio Claude
@@ -112,6 +118,7 @@ olhando os frames; os scripts Python fazem o trabalho determinístico:
 | `scripts/compose_camera.py` | card da câmera (arredondado/círculo/chroma key) sobre o vídeo |
 | `scripts/mix_audio.py` | mixa/seleciona o áudio das duas gravações |
 | `scripts/sync_offset.py` | detecta o offset entre tela e câmera por correlação de áudio |
+| `scripts/cut_silence.py` | remove silêncios/pausas do vídeo final (com modo de análise prévia) |
 
 Todos os scripts têm `--help` e também podem ser usados manualmente, sem o
 Claude.
