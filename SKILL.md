@@ -198,7 +198,11 @@ conferir frames do resultado → entregar com resumo das decisões.
 - `ffmpeg not found`: instalar conforme o README (apt no Linux, winget no
   Windows) e reabrir o terminal.
 - Render lento: `--preset fast` ou `--crf 21` no render_vertical; o tempo
-  cresce linearmente com a duração.
+  cresce linearmente com a duração. Se o usuário tiver GPU (ou pedir
+  velocidade), use `--encoder amd|nvidia|intel|auto` em render_vertical,
+  compose_camera e cut_silence — AMD usa AMF no Windows e VAAPI no Linux, e
+  qualquer valor cai de volta para CPU (com aviso) se a GPU não funcionar.
+  Padrão continua CPU porque libx264 rende texto de tela com mais qualidade.
 - Texto ilegível no celular: regiões menores (mais zoom) no plan.json.
 - Câmera fora de sincronia: refaça o sync_offset com `--window` maior ou
   ajuste o offset manualmente (positivo corta o início da câmera).

@@ -62,10 +62,40 @@ ffmpeg -version
 ffprobe -version
 ```
 
+### Aceleração por GPU (opcional)
+
+Os scripts que re-encodam vídeo (`render_vertical.py`, `compose_camera.py`,
+`cut_silence.py`) aceitam `--encoder` para usar a GPU:
+
+| Valor | Encoder usado |
+|---|---|
+| `cpu` (padrão) | libx264 — melhor qualidade por tamanho para texto de tela |
+| `amd` | AMF (`h264_amf`) no Windows, VAAPI (`h264_vaapi`) no Linux |
+| `nvidia` | NVENC (`h264_nvenc`) |
+| `intel` | Quick Sync (`h264_qsv`) ou VAAPI |
+| `auto` | detecta e usa a primeira GPU que funcionar |
+
+Se o encoder pedido não existir no seu FFmpeg ou o teste de hardware falhar,
+o script avisa e continua na CPU — nunca quebra por falta de GPU.
+
+Pré-requisitos para **AMD**:
+
+- **Windows**: driver AMD Adrenalin instalado e um build completo do FFmpeg
+  (o do `winget install Gyan.FFmpeg` já vem com `h264_amf`). Confirme com
+  `ffmpeg -encoders | findstr amf`.
+- **Linux**: driver Mesa com VA-API (`sudo apt install mesa-va-drivers
+  vainfo`), seu usuário nos grupos `video` e `render`
+  (`sudo usermod -aG video,render $USER`, relogue depois) e o dispositivo
+  `/dev/dri/renderD128` presente. Confirme com `vainfo` e
+  `ffmpeg -encoders | grep vaapi`.
+
+Nota de qualidade: encoders de GPU são muito mais rápidos, mas para conteúdo
+de tela (texto de código) o libx264 rende melhor qualidade no mesmo tamanho —
+por isso a CPU continua sendo o padrão. Use GPU quando a velocidade importar
+mais (vídeos longos, iterações de ajuste).
+
 ### Observações
 
-- O re-encode usa CPU (libx264); vídeos longos levam alguns minutos. Se tiver
-  GPU NVIDIA, dá para pedir ao Claude para usar NVENC nas etapas só-FFmpeg.
 - Reserve espaço em disco temporário (~o tamanho do vídeo de entrada) para os
   arquivos intermediários.
 - Formatos de entrada: qualquer coisa que o FFmpeg leia (mp4, mkv, mov, webm...).

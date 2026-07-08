@@ -35,7 +35,8 @@ import sys
 import cv2
 import numpy as np
 
-from common import check_binaries, die, even, video_info
+from common import ENCODER_CHOICES, check_binaries, die, even, select_encoder, \
+    video_info
 
 
 def ease_in_out(p: float) -> float:
@@ -129,6 +130,10 @@ def main():
                         help="pan/zoom animation length in seconds (default 0.8)")
     parser.add_argument("--crf", type=int, default=19, help="x264 quality (default 19)")
     parser.add_argument("--preset", default="medium", help="x264 preset (default medium)")
+    parser.add_argument("--encoder", choices=ENCODER_CHOICES, default="cpu",
+                        help="video encoder: cpu (libx264, default), amd (AMF/VAAPI), "
+                             "nvidia (NVENC), intel (QSV/VAAPI) or auto; GPU choices "
+                             "fall back to cpu when unavailable")
     parser.add_argument("--no-audio", action="store_true",
                         help="do not carry the source audio over")
     args = parser.parse_args()
@@ -149,17 +154,20 @@ def main():
     if not capture.isOpened():
         die(f"could not open {args.video}")
 
+    enc = select_encoder(args.encoder, args.crf, args.preset)
     encode = [
         "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+        *enc["global_args"],
         "-f", "rawvideo", "-pix_fmt", "bgr24", "-s", f"{out_w}x{out_h}",
         "-r", f"{fps}", "-i", "pipe:0",
     ]
     if not args.no_audio and info["audio"]:
         encode += ["-i", args.video, "-map", "0:v", "-map", "1:a:0",
                    "-c:a", "aac", "-b:a", "192k"]
+    if enc["vf"]:
+        encode += ["-vf", enc["vf"]]
     encode += [
-        "-c:v", "libx264", "-preset", args.preset, "-crf", str(args.crf),
-        "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-shortest", args.out,
+        *enc["codec_args"], "-movflags", "+faststart", "-shortest", args.out,
     ]
     encoder = subprocess.Popen(encode, stdin=subprocess.PIPE)
 
@@ -187,7 +195,7 @@ def main():
         encoder.wait()
     if encoder.returncode != 0:
         die("ffmpeg encoder failed")
-    print(f"done: {args.out} ({n} frames, {out_w}x{out_h})")
+    print(f"done: {args.out} ({n} frames, {out_w}x{out_h}, encoder {enc['codec']})")
 
 
 if __name__ == "__main__":
