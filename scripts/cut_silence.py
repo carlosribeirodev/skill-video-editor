@@ -20,7 +20,8 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from common import check_binaries, die, run, video_info
+from common import ENCODER_CHOICES, check_binaries, die, run, select_encoder, \
+    video_info
 
 MIN_KEEP = 0.10  # segments shorter than this are noise, drop them
 
@@ -77,6 +78,9 @@ def main():
                         help="just print the detected pauses and totals as JSON")
     parser.add_argument("--crf", type=int, default=19)
     parser.add_argument("--preset", default="medium")
+    parser.add_argument("--encoder", choices=ENCODER_CHOICES, default="cpu",
+                        help="video encoder: cpu (libx264, default), amd, nvidia, "
+                             "intel or auto; GPU choices fall back to cpu")
     args = parser.parse_args()
 
     check_binaries()
@@ -118,8 +122,13 @@ def main():
             f"[0:v]trim=start={s:.4f}:end={e:.4f},setpts=PTS-STARTPTS[v{i}];"
             f"[0:a]atrim=start={s:.4f}:end={e:.4f},asetpts=PTS-STARTPTS[a{i}];")
         labels.append(f"[v{i}][a{i}]")
+    enc = select_encoder(args.encoder, args.crf, args.preset)
     graph = "".join(parts) + \
         f"{''.join(labels)}concat=n={len(keeps)}:v=1:a=1[v][a]"
+    video_label = "[v]"
+    if enc["vf"]:
+        graph += f";[v]{enc['vf']}[vout]"
+        video_label = "[vout]"
 
     # The graph can exceed the command-line limit on long videos; use a file.
     with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as f:
@@ -127,10 +136,10 @@ def main():
         script = f.name
     try:
         run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
-             "-i", args.video, "-filter_complex_script", script,
-             "-map", "[v]", "-map", "[a]",
-             "-c:v", "libx264", "-preset", args.preset, "-crf", str(args.crf),
-             "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k",
+             *enc["global_args"], "-i", args.video,
+             "-filter_complex_script", script,
+             "-map", video_label, "-map", "[a]",
+             *enc["codec_args"], "-c:a", "aac", "-b:a", "192k",
              "-movflags", "+faststart", args.out])
     finally:
         Path(script).unlink(missing_ok=True)

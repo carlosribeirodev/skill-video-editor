@@ -18,7 +18,8 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFilter
 
-from common import check_binaries, die, even, run, video_info
+from common import ENCODER_CHOICES, check_binaries, die, even, run, \
+    select_encoder, video_info
 
 POSITIONS = ("topleft", "topcenter", "topright",
              "bottomleft", "bottomcenter", "bottomright")
@@ -102,6 +103,9 @@ def main():
     parser.add_argument("--chroma-blend", type=float, default=0.10)
     parser.add_argument("--crf", type=int, default=19)
     parser.add_argument("--preset", default="medium")
+    parser.add_argument("--encoder", choices=ENCODER_CHOICES, default="cpu",
+                        help="video encoder: cpu (libx264, default), amd, nvidia, "
+                             "intel or auto; GPU choices fall back to cpu")
     args = parser.parse_args()
 
     check_binaries()
@@ -129,7 +133,9 @@ def main():
 
     cam_filters = [f for f in (crop, f"scale={cam_w}:{cam_h}", "setsar=1") if f]
 
-    cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", args.base]
+    enc = select_encoder(args.encoder, args.crf, args.preset)
+    cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+           *enc["global_args"], "-i", args.base]
     if args.offset > 0:
         cmd += ["-ss", f"{args.offset}"]
     cmd += ["-i", args.camera]
@@ -164,10 +170,11 @@ def main():
             f"[bg][camr]overlay={x}:{y}:eof_action=pass[v]"
         )
 
+    if enc["vf"]:
+        graph += f";[v]{enc['vf']}[vout]"
     cmd += [
-        "-filter_complex", graph, "-map", "[v]", "-map", "0:a?",
-        "-c:v", "libx264", "-preset", args.preset, "-crf", str(args.crf),
-        "-pix_fmt", "yuv420p", "-c:a", "copy",
+        "-filter_complex", graph, "-map", "[vout]" if enc["vf"] else "[v]",
+        "-map", "0:a?", *enc["codec_args"], "-c:a", "copy",
         "-movflags", "+faststart", "-shortest", args.out,
     ]
     run(cmd)
